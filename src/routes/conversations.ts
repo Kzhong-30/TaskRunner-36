@@ -240,11 +240,11 @@ router.post('/:id/messages', async (req: Request, res: Response) => {
 
         res.write(`event: done\ndata: ${JSON.stringify({ success: true, reply: finalResult.reply })}\n\n`);
       } catch (err: any) {
-        res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
         if (isClientConnected) {
-      }
+          res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
         }
 
+      }
       res.end();
       cleanup();
       return;

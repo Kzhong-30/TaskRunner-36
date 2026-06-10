@@ -150,7 +150,7 @@ class IntentService {
       }
     } catch {}
 
-    if (result.confidence < 0.35) {
+    if (result.confidence < 0.15) {
       return {
         intent: 'unknown',
         displayName: this.getDisplayName('unknown'),

@@ -88,7 +88,7 @@ class KnowledgeService {
     const results: KnowledgeMatch[] = [];
     for (const [id, score] of scores) {
       const k = knowledgeMap.get(id);
-      if (k && score > 0.08) {
+      if (k && score > 0.02) {
         results.push({ knowledge: k, score, matchedBy: 'tfidf' });
       }
     }
