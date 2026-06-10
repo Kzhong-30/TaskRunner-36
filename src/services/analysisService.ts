@@ -1,4 +1,5 @@
 import { Message, Conversation } from '../models';
+import { extractTopKeywords } from '../utils/nlp';
 
 export interface SentimentResult {
   label: 'positive' | 'neutral' | 'negative';
@@ -14,7 +15,7 @@ export interface ConversationAnalysis {
   durationMinutes: number;
   sentiment: SentimentResult;
   satisfactionScore: number;
-  keywords: Array<{ word: string; count: number }>;
+  keywords: Array<{ word: string; count: number; score: number }>;
   intent?: string;
   topics: string[];
   humanTransferRequested: boolean;
@@ -62,39 +63,7 @@ class AnalysisService {
     return { label, score: rawScore, confidence };
   }
 
-  extractKeywords(texts: string[], topN = 10): Array<{ word: string; count: number }> {
-    const stopWords = new Set([
-      '的', '了', '是', '我', '你', '他', '她', '它', '在', '有', '和', '就', '都', '而', '及',
-      '与', '着', '或', '一个', '没有', '我们', '你们', '他们', '这个', '那个', '什么', '怎么',
-      '如果', '因为', '所以', '但是', '然后', '已经', '可以', '可能', '应该', '需要',
-      'the', 'a', 'an', 'is', 'are', 'was', 'were', 'i', 'you', 'he', 'she', 'it', 'we', 'they',
-      'this', 'that', 'what', 'how', 'why', 'when', 'where', 'which', 'and', 'or', 'but', 'of', 'to',
-      'in', 'on', 'for', 'with', 'at', 'by', 'from', 'as', 'into', 'about'
-    ]);
 
-    const freq = new Map<string, number>();
-    for (const text of texts) {
-      const cleaned = text.toLowerCase().replace(/[^\w\u4e00-\u9fa5\s]/g, ' ');
-      const tokens = cleaned.split(/\s+/).filter(t => t.length >= 2 && !stopWords.has(t));
-
-      for (const token of tokens) {
-        freq.set(token, (freq.get(token) || 0) + 1);
-      }
-
-      const chars = Array.from(text).filter(c => /[\u4e00-\u9fa5]/.test(c));
-      for (let i = 0; i < chars.length - 1; i++) {
-        const bigram = chars[i] + chars[i + 1];
-        if (!stopWords.has(bigram)) {
-          freq.set(bigram, (freq.get(bigram) || 0) + 1);
-        }
-      }
-    }
-
-    return Array.from(freq.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, topN)
-      .map(([word, count]) => ({ word, count }));
-  }
 
   async analyzeConversation(conversationId: string): Promise<ConversationAnalysis> {
     const conversation = await Conversation.findByPk(conversationId);
@@ -132,7 +101,7 @@ class AnalysisService {
 
     const satisfactionScore = Math.round(((avgScore + 1) / 2) * 100);
 
-    const keywords = this.extractKeywords(allTexts, 15);
+    const keywords = extractTopKeywords(allTexts, 15);
 
     const topics = this.extractTopics(allTexts);
 

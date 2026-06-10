@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { conversationService } from '../services/conversationService';
 import { analysisService } from '../services/analysisService';
 import { KnowledgeMatch } from '../services/knowledgeService';
+import { config } from '../config';
 
 const router = Router();
 
@@ -188,6 +189,27 @@ router.post('/:id/messages', async (req: Request, res: Response) => {
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
 
+      let isClientConnected: boolean = true;
+      let heartbeatTimer: NodeJS.Timeout | null = null;
+
+      const cleanup = () => {
+        isClientConnected = false;
+        if (heartbeatTimer) {
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
+        }
+      };
+
+      req.on('close', () => {
+        cleanup();
+      });
+
+      heartbeatTimer = setInterval(() => {
+        if (isClientConnected) {
+          res.write(': heartbeat\n\n');
+        }
+      }, config.sse.heartbeatInterval);
+
       let finalResult: any = null;
 
       try {
@@ -195,9 +217,15 @@ router.post('/:id/messages', async (req: Request, res: Response) => {
           id,
           message.trim(),
           (token) => {
+            if (!isClientConnected) return;
             res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
           }
         );
+
+        if (!isClientConnected) {
+          cleanup();
+          return;
+        }
 
         res.write(`event: meta\ndata: ${JSON.stringify({
           intent: finalResult.intentResult,
@@ -213,9 +241,12 @@ router.post('/:id/messages', async (req: Request, res: Response) => {
         res.write(`event: done\ndata: ${JSON.stringify({ success: true, reply: finalResult.reply })}\n\n`);
       } catch (err: any) {
         res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
+        if (isClientConnected) {
       }
+        }
 
       res.end();
+      cleanup();
       return;
     }
 

@@ -1,115 +1,178 @@
 import { Intent, IntentType } from '../models';
+import { NaiveBayesIntentClassifier, tokenize } from '../utils/nlp';
 
 export interface IntentDetectionResult {
   intent: IntentType;
   displayName: string;
   confidence: number;
-  matchedKeywords: string[];
+  matchedTokens: string[];
 }
 
 class IntentService {
-  private intentConfig: Record<IntentType, { keywords: string[]; examples: string[] }> = {
+  private classifier: NaiveBayesIntentClassifier | null = null;
+
+  private intentConfig: Record<IntentType, { displayName: string; examples: string[] }> = {
     consultation: {
-      keywords: ['咨询', '了解', '查询', '请问', '什么是', '怎么', '如何', '说明', '介绍', '想知道', '问一下', '咨询一下'],
-      examples: ['这个产品怎么使用？', '请问你们的营业时间是什么？', '我想了解一下贵公司的服务']
+      displayName: '产品咨询',
+      examples: [
+        '这个产品怎么使用',
+        '请问你们的营业时间是什么',
+        '我想了解一下贵公司的服务',
+        '产品有什么功能',
+        '这款产品多少钱',
+        '能介绍一下你们的服务吗',
+        '什么是会员制度',
+        '如何开通账号',
+        '请问支持哪些支付方式',
+        '产品规格是多少'
+      ]
     },
     complaint: {
-      keywords: ['投诉', '差评', '不满', '愤怒', '失望', '投诉你们', '垃圾', '差劲', '太差了', '糟糕', '骗子', '举报'],
-      examples: ['我要投诉这个产品！', '你们的服务太差了', '对这次体验非常失望']
+      displayName: '用户投诉',
+      examples: [
+        '我要投诉这个产品',
+        '你们的服务太差了',
+        '对这次体验非常失望',
+        '这就是你们的质量吗',
+        '我要投诉你们的客服',
+        '东西质量太垃圾了',
+        '再也不会买了骗人的',
+        '太差劲了完全没用',
+        '我要举报你们虚假宣传',
+        '什么垃圾东西退钱'
+      ]
     },
     after_sales: {
-      keywords: ['退货', '退款', '售后', '维修', '保修', '换货', '更换', '坏了', '质量问题', '退钱', '7天无理由', '三包'],
-      examples: ['我想申请退货', '这个产品坏了可以修吗？', '怎么办理退款？']
+      displayName: '售后服务',
+      examples: [
+        '我想申请退货',
+        '这个产品坏了可以修吗',
+        '怎么办理退款',
+        '申请换货流程是什么',
+        '保修期有多久',
+        '商品有质量问题怎么办',
+        '七天无理由退货吗',
+        '售后电话是多少',
+        '坏了找谁维修',
+        '可以退换货吗'
+      ]
     },
     order_query: {
-      keywords: ['订单', '物流', '发货', '快递', '下单', '购买', '付款', '支付', '到哪了', '查订单', '单号', '运单'],
-      examples: ['我的订单发货了吗？', '查一下快递到哪了', '怎么还没收到货？']
+      displayName: '订单查询',
+      examples: [
+        '我的订单发货了吗',
+        '查一下快递到哪了',
+        '怎么还没收到货',
+        '物流信息不对',
+        '订单号在哪里看',
+        '什么时候能到货',
+        '下单后多久发货',
+        '快递单号是多少',
+        '我想查一下我的订单',
+        '货到付款可以吗'
+      ]
     },
     human_transfer: {
-      keywords: ['人工', '转人工', '客服', '真人', '工作人员', '找你们经理', '接人工', '叫人来', '不要机器人', '人呢'],
-      examples: ['我要找人工客服', '转人工服务', '让真人接电话']
+      displayName: '人工转接',
+      examples: [
+        '我要找人工客服',
+        '转人工服务',
+        '让真人接电话',
+        '不要机器人',
+        '叫你们的人来',
+        '人工客服在吗',
+        '我要和真人说话',
+        '接人工',
+        '客服有人吗',
+        '有没有活人'
+      ]
     },
     unknown: {
-      keywords: [],
+      displayName: '未知意图',
       examples: []
     }
   };
 
   async ensureDefaultIntents() {
-    for (const [name, cfg] of Object.entries(this.intentConfig)) {
-      const intentName = name as IntentType;
-      const [intent] = await Intent.findOrCreate({
-        where: { name: intentName },
+    const entries = Object.entries(this.intentConfig) as [IntentType, typeof this.intentConfig[IntentType]][];
+    for (const [name, cfg] of entries) {
+      await Intent.findOrCreate({
+        where: { name },
         defaults: {
-          name: intentName,
-          displayName: this.getDisplayName(intentName),
-          description: `Default intent: ${intentName}`,
-          keywords: cfg.keywords,
+          name,
+          displayName: cfg.displayName,
+          description: 'Default intent: ' + name,
           examples: cfg.examples,
-          priority: intentName === 'human_transfer' ? 100 : intentName === 'unknown' ? 0 : 50,
+          keywords: [],
+          priority: name === 'human_transfer' ? 100 : name === 'unknown' ? 0 : 50,
           enabled: true
         }
       });
-      if (intent.keywords?.length === 0 && cfg.keywords.length > 0) {
-        await intent.update({ keywords: cfg.keywords, examples: cfg.examples });
-      }
     }
+    await this.trainClassifier();
   }
 
-  private getDisplayName(intent: IntentType): string {
-    const map: Record<IntentType, string> = {
-      consultation: '产品咨询',
-      complaint: '用户投诉',
-      after_sales: '售后服务',
-      order_query: '订单查询',
-      human_transfer: '人工转接',
-      unknown: '未知意图'
-    };
-    return map[intent];
-  }
-
-  async detect(userMessage: string): Promise<IntentDetectionResult> {
+  private async trainClassifier() {
     const intents = await Intent.findAll({ where: { enabled: true } });
-    const lowerMsg = userMessage.toLowerCase();
-
-    let best: IntentDetectionResult = {
-      intent: 'unknown',
-      displayName: '未知意图',
-      confidence: 0,
-      matchedKeywords: []
-    };
+    this.classifier = new NaiveBayesIntentClassifier();
 
     for (const intent of intents) {
       if (intent.name === 'unknown') continue;
-
-      const keywords = intent.keywords || [];
-      const matched: string[] = [];
-      for (const kw of keywords) {
-        if (lowerMsg.includes(kw.toLowerCase())) {
-          matched.push(kw);
-        }
-      }
-
-      const coverage = keywords.length > 0 ? matched.length / keywords.length : 0;
-      const density = userMessage.length > 0 ? matched.length / (userMessage.length / 3) : 0;
-      const priorityBoost = (intent.priority || 50) / 100 * 0.2;
-      const confidence = Math.min(0.95, coverage * 0.5 + density * 0.3 + priorityBoost + (matched.length > 0 ? 0.1 : 0));
-
-      if (confidence > best.confidence) {
-        best = {
-          intent: intent.name,
-          displayName: intent.displayName,
-          confidence,
-          matchedKeywords: matched
-        };
+      const examples = intent.examples || [];
+      for (const example of examples) {
+        this.classifier.addDocument(example, intent.name);
       }
     }
 
-    return best;
+    this.classifier.train();
+  }
+
+  private getDisplayName(intent: IntentType): string {
+    return this.intentConfig[intent]?.displayName || intent;
+  }
+
+  async detect(userMessage: string): Promise<IntentDetectionResult> {
+    if (!this.classifier || !this.classifier.isTrained()) {
+      await this.trainClassifier();
+    }
+
+    const tokens = tokenize(userMessage);
+    const result = this.classifier!.classify(userMessage);
+    const intentName = (result.label as IntentType) || 'unknown';
+
+    let matchedTokens: string[] = [];
+    try {
+      const dbIntent = await Intent.findOne({ where: { name: intentName, enabled: true } });
+      if (dbIntent?.keywords) {
+        matchedTokens = dbIntent.keywords.filter(kw =>
+          tokens.some(t => t.includes(kw) || kw.includes(t))
+        ).slice(0, 10);
+      }
+    } catch {}
+
+    if (result.confidence < 0.35) {
+      return {
+        intent: 'unknown',
+        displayName: this.getDisplayName('unknown'),
+        confidence: result.confidence,
+        matchedTokens: []
+      };
+    }
+
+    return {
+      intent: intentName,
+      displayName: this.getDisplayName(intentName),
+      confidence: result.confidence,
+      matchedTokens
+    };
   }
 
   async listIntents(): Promise<Intent[]> {
     return Intent.findAll({ order: [['priority', 'DESC']] });
+  }
+
+  async retrain() {
+    await this.trainClassifier();
   }
 }
 

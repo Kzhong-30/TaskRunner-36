@@ -1,6 +1,9 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
+import { apiKeyAuth } from './middleware/auth';
+import { apiLimiter } from './middleware/rateLimit';
+
 
 import { config } from './config';
 import { initDatabase } from './config/database';
@@ -55,6 +58,9 @@ app.get('/', (_req: Request, res: Response) => {
   });
 });
 
+
+app.use('/api/v1', apiLimiter);
+app.use('/api/v1', apiKeyAuth);
 app.use('/api/v1/conversations', conversationsRouter);
 app.use('/api/v1/knowledge', knowledgeRouter);
 app.use('/api/v1/intents', intentsRouter);

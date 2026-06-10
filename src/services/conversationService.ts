@@ -80,7 +80,7 @@ class ConversationService {
       });
       return {
         reply: '您的对话已转接人工客服，客服人员会尽快为您处理，请稍候。',
-        intentResult: { intent: 'human_transfer', displayName: '人工转接', confidence: 1, matchedKeywords: [] },
+        intentResult: { intent: 'human_transfer', displayName: '人工转接', confidence: 1, matchedTokens: [] },
         knowledgeMatches: [],
         humanTransfer: true
       };
