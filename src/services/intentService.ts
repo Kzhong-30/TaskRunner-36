@@ -9,6 +9,14 @@ export interface IntentDetectionResult {
 }
 
 class IntentService {
+  private keywordMap: Record<string, string[]> = {
+      consultation: ['产品', '服务', '介绍', '价格', '功能', '使用', '规格', '特色', '材质', '优惠', '咨询', '了解', '请问', '什么', '如何', '多少钱', '有什么'],
+      complaint: ['投诉', '差', '垃圾', '失望', '骗', '烂', '不满', '态度', '举报', '虚假', '差评', '生气', '愤怒', '糟糕', '太差', '骗人', '垃圾玩意'],
+      after_sales: ['退货', '退款', '换货', '维修', '保修', '售后', '退换', '破损', '修理', '退换货', '七天无理由', '质量问题', '退款申请', '售后维修', '保修卡', '退换申请'],
+      order_query: ['订单', '快递', '发货', '物流', '收货', '查询', '单号', '到货', '配送', '快递单号', '订单号', '发货了吗', '物流信息', '什么时候到', '查快递', '我的订单'],
+      human_transfer: ['人工', '真人', '客服', '转人工', '活人', '管理员', '人工客服', '在线客服', '找客服', '客服人员', '不要机器人', '人工服务', '接人工', '人工台', '客服专员', '找人工'],
+      unknown: []
+    };
   private classifier: NaiveBayesIntentClassifier | null = null;
 
   private intentConfig: Record<IntentType, { displayName: string; examples: string[] }> = {
@@ -216,21 +224,14 @@ class IntentService {
     const intents = await Intent.findAll({ where: { enabled: true } });
     this.classifier = new NaiveBayesIntentClassifier();
 
-    const KEYWORD_MAP: Record<string, string[]> = {
-      consultation: ['产品', '服务', '介绍', '价格', '功能', '使用', '规格', '特色', '材质', '优惠'],
-      complaint: ['投诉', '差', '垃圾', '失望', '骗', '烂', '不满', '态度', '举报', '虚假'],
-      after_sales: ['退货', '退款', '换货', '维修', '保修', '售后', '退换', '破损'],
-      order_query: ['订单', '快递', '发货', '物流', '收货', '查询', '单号', '到货'],
-      human_transfer: ['人工', '真人', '客服', '转人工', '活人', '管理员'],
-      unknown: []
-    };
+    const KEYWORD_MAP = this.keywordMap;
 
     for (const intent of intents) {
       if (intent.name === 'unknown') continue;
       const examples = intent.examples || [];
       const keywords = KEYWORD_MAP[intent.name] || [];
       for (const example of examples) {
-        this.classifier.addDocument(example + ' ' + keywords.join(' '), intent.name);
+        this.classifier.addDocument(example + ' ' + keywords.join(' ') + ' ' + keywords.join(' ') + ' ' + keywords.join(' '), intent.name);
       }
     }
 
@@ -250,14 +251,7 @@ class IntentService {
     const result = this.classifier!.classify(userMessage);
     const intentName = (result.label as IntentType) || 'unknown';
 
-    const KEYWORD_MAP: Record<IntentType, string[]> = {
-      consultation: ['产品', '服务', '介绍', '价格', '功能', '使用', '规格', '特色', '材质', '优惠'],
-      complaint: ['投诉', '差', '垃圾', '失望', '骗', '烂', '不满', '态度', '举报', '虚假'],
-      after_sales: ['退货', '退款', '换货', '维修', '保修', '售后', '退换', '破损'],
-      order_query: ['订单', '快递', '发货', '物流', '收货', '查询', '单号', '到货'],
-      human_transfer: ['人工', '真人', '客服', '转人工', '活人', '管理员'],
-      unknown: []
-    };
+    const KEYWORD_MAP = this.keywordMap;
     const keywords = KEYWORD_MAP[intentName] || [];
     const matchedTokens = keywords.filter(kw =>
       tokens.some(t => t.includes(kw) || kw.includes(t))
@@ -266,7 +260,7 @@ class IntentService {
 
     const scaledConfidence = Math.pow(result.confidence, 0.6);
 
-    if (result.confidence < 0.05) {
+    if (scaledConfidence < 0.25) {
       return {
         intent: 'unknown',
         displayName: this.getDisplayName('unknown'),

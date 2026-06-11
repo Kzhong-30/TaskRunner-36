@@ -75,7 +75,8 @@ class KnowledgeService {
         }
       }
       if (keywordHitCount > 0) {
-        const normalizedKeywordScore = Math.min(1, keywordHitCount / Math.max(1, queryTokens.length));
+        const denom = Math.max(1, Math.min(queryTokens.length, 6));
+        const normalizedKeywordScore = Math.min(1, keywordHitCount / denom);
         scores.set(k.id, { score: normalizedKeywordScore, method: 'keyword' });
       }
     }
@@ -102,11 +103,11 @@ class KnowledgeService {
               scores.set(docIds[i], { score: hybrid, method: 'hybrid' });
             }
           } else {
-            scores.set(docIds[i], { score: hybrid, method: 'tfidf' });
+            scores.set(docIds[i], { score: hybrid, method: 'hybrid' });
           }
         } catch {
           if (!scores.has(docIds[i])) {
-            scores.set(docIds[i], { score: 0, method: 'tfidf' });
+            scores.set(docIds[i], { score: 0, method: 'hybrid' });
           }
         }
       }

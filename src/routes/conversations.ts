@@ -193,6 +193,7 @@ router.post('/:id/messages', async (req: Request, res: Response) => {
       let heartbeatTimer: NodeJS.Timeout | null = null;
 
       const cleanup = () => {
+        if (!isClientConnected) return;
         isClientConnected = false;
         if (heartbeatTimer) {
           clearInterval(heartbeatTimer);
@@ -223,7 +224,6 @@ router.post('/:id/messages', async (req: Request, res: Response) => {
         );
 
         if (!isClientConnected) {
-          cleanup();
           return;
         }
 

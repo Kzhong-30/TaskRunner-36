@@ -90,8 +90,8 @@ class AnalysisService {
     const avgScore = isNaN(rawAvgScore) ? 0 : rawAvgScore;
     const rawAvgConf = sentiments.length > 0
       ? Number(sentiments.reduce((s, r) => Number(s) + Number(r.confidence), 0)) / sentiments.length
-      : 0.5;
-    const avgConf = isNaN(rawAvgConf) ? 0.5 : rawAvgConf;
+      : 0.2;
+    const avgConf = isNaN(rawAvgConf) ? 0.2 : rawAvgConf;
 
     let sentimentLabel: 'positive' | 'neutral' | 'negative' = 'neutral';
     if (avgScore > 0.15) sentimentLabel = 'positive';

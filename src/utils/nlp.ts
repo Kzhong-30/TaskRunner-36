@@ -15,13 +15,9 @@ const STOP_WORDS = new Set([
 const MEANINGLESS_BIGRAMS = new Set([
   '们的', '问你', '品怎', '么退', '货我', '议您', '您可', '的产',
   '的的', '了了', '是是', '在在', '我我', '你你',
-  '请问', '了我', '一下', '一个', '没有', '我们', '你们',
-  '的话', '一种', '一样', '一起', '一般', '一定', '就是', '真是', '还是', '或者',
-  '以及', '等等', '之类', '什么', '怎么', '为什么', '哪里', '哪个', '哪些', '怎样',
-  '如何', '可以', '能够', '是否', '他们', '它们', '这个', '那个', '每个', '各个',
-  '某个', '其他', '其它', '自己', '别人', '大家', '咱们', '你好', '您好', '谢谢',
-  '请问一下', '能不能', '可不可以',
-  '行不行', '好不好', '对不对', '是不是', '有没有', '在不在', '了吗', '吗呢',
+  '了我',
+  '的话',
+  '了吗', '吗呢',
   '呢啊', '啊吧', '吧呀', '呀哦', '哦嗯', '的了', '了的', '是在', '在是', '我你',
   '你我', '的是', '是的', '了投', '诉要', '要退', '退了', '货退', '了太', '太差', '差了', '货联', '系人'
 ]);
@@ -140,15 +136,21 @@ export function extractTopKeywords(texts: string[], topN = 10): Array<{ word: st
   }
 
   const tfidfLookup = new Map<string, number>();
+  const docFreq = new Map<string, number>();
   const docCount = texts.length;
   for (let i = 0; i < docCount; i++) {
     try {
       const terms = tfidf.listTerms(i);
+      const seenInDoc = new Set<string>();
       for (const t of terms) {
         const term = (t as any).term as string;
         const val = (t as any).tfidf as number;
         const prev = tfidfLookup.get(term) || 0;
         tfidfLookup.set(term, Math.max(prev, val));
+        if (!seenInDoc.has(term)) {
+          seenInDoc.add(term);
+          docFreq.set(term, (docFreq.get(term) || 0) + 1);
+        }
       }
     } catch {}
   }
@@ -156,7 +158,9 @@ export function extractTopKeywords(texts: string[], topN = 10): Array<{ word: st
   const scored = Array.from(freq.entries())
     .map(([word, count]) => {
       const tfidfScore = tfidfLookup.get(word) || 0;
-      const score = count * 0.4 + tfidfScore * 0.4;
+      const df = docFreq.get(word) || 0;
+      const dfBoost = 1 + Math.log10(df + 1);
+      const score = count * 0.4 + tfidfScore * dfBoost * 0.4;
       return { word, count, score };
     })
     .sort((a, b) => b.score - a.score);
