@@ -5,7 +5,7 @@ const STOP_WORDS = new Set([
   '与', '着', '或', '一个', '没有', '我们', '你们', '他们', '这个', '那个', '什么', '怎么',
   '如果', '因为', '所以', '但是', '然后', '已经', '可以', '可能', '应该', '需要',
   '吗', '呢', '啊', '吧', '呀', '哦', '嗯',
-  '如何', '根据', '描述', '建议', '你们', '他们', '一下', '请问', '什么',
+  '如何', '根据', '描述', '建议', '一下', '请问', '其实', '真的', '当然',
   'the', 'a', 'an', 'is', 'are', 'was', 'were', 'i', 'you', 'he', 'she', 'it', 'we', 'they',
   'this', 'that', 'what', 'how', 'why', 'when', 'where', 'which', 'and', 'or',
   'but', 'of', 'to', 'in', 'on', 'for', 'with', 'at', 'by', 'from', 'as',
@@ -23,7 +23,7 @@ const MEANINGLESS_BIGRAMS = new Set([
   '感谢', '抱歉', '对不起', '不好意思', '打扰了', '请问一下', '能不能', '可不可以',
   '行不行', '好不好', '对不对', '是不是', '有没有', '在不在', '了吗', '吗呢',
   '呢啊', '啊吧', '吧呀', '呀哦', '哦嗯', '的了', '了的', '是在', '在是', '我你',
-  '你我', '的是', '是的'
+  '你我', '的是', '是的', '了投', '诉要', '要退', '差了', '了投', '了太', '差了', '了投', '投诉', '退换', '换货'
 ]);
 
 export function tokenize(text: string): string[] {
@@ -139,14 +139,23 @@ export function extractTopKeywords(texts: string[], topN = 10): Array<{ word: st
     tfidf.addDocument(tokenize(text));
   }
 
+  const tfidfLookup = new Map<string, number>();
+  const docCount = texts.length;
+  for (let i = 0; i < docCount; i++) {
+    try {
+      const terms = tfidf.listTerms(i);
+      for (const t of terms) {
+        const term = (t as any).term as string;
+        const val = (t as any).tfidf as number;
+        const prev = tfidfLookup.get(term) || 0;
+        tfidfLookup.set(term, prev + val);
+      }
+    } catch {}
+  }
+
   const scored = Array.from(freq.entries())
     .map(([word, count]) => {
-      let tfidfScore = 0;
-      try {
-        const terms = tfidf.listTerms(0);
-        const found = terms.find((t: any) => t.term === word);
-        tfidfScore = found ? found.tfidf : 0;
-      } catch {}
+      const tfidfScore = tfidfLookup.get(word) || 0;
       const score = count * 0.4 + tfidfScore * 0.4;
       return { word, count, score };
     })

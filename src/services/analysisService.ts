@@ -49,11 +49,13 @@ class AnalysisService {
 
     const total = pos + neg;
     if (total === 0) {
-      return { label: 'neutral', score: 0, confidence: 0.5 };
+      return { label: 'neutral', score: 0, confidence: 0.2 };
     }
 
     const rawScore = (pos - neg) / total;
-    const confidence = Math.min(1, total / 3);
+    const strength = Math.abs(pos - neg) / total;
+    const coverage = Math.min(1, total / 4);
+    const confidence = Math.min(1, Math.max(0.3, strength * 0.5 + coverage * 0.5));
     let label: 'positive' | 'neutral' | 'negative';
 
     if (rawScore > 0.15) label = 'positive';
@@ -101,7 +103,25 @@ class AnalysisService {
       confidence: avgConf
     };
 
-    const satisfactionScore = Math.round(((avgScore + 1) / 2) * 100);
+    const sentimentNorm = (avgScore + 1) / 2;
+    const confWeight = overallSentiment.confidence;
+    let satisfactionScore = sentimentNorm * confWeight + 0.5 * (1 - confWeight);
+
+    const humanTransferRequested = userMessages.some(m =>
+      /人工|真人|客服人员|不要机器人/.test(m.content)
+    ) || conversation.status === 'waiting_for_human';
+
+    if (humanTransferRequested) {
+      satisfactionScore -= 0.15;
+    }
+    if (overallSentiment.label === 'negative') {
+      satisfactionScore -= 0.1;
+    }
+    if (overallSentiment.label === 'positive' && confWeight > 0.6) {
+      satisfactionScore += 0.1;
+    }
+
+    satisfactionScore = Math.round(Math.min(100, Math.max(0, satisfactionScore * 100)));
 
     const keywords = extractTopKeywords(allTexts, 15);
 
@@ -110,10 +130,6 @@ class AnalysisService {
     const durationMinutes = messages.length >= 2
       ? Math.max(1, Math.round((messages[messages.length - 1].createdAt.getTime() - messages[0].createdAt.getTime()) / 60000))
       : 0;
-
-    const humanTransferRequested = userMessages.some(m =>
-      /人工|真人|客服人员|不要机器人/.test(m.content)
-    ) || conversation.status === 'waiting_for_human';
 
     return {
       conversationId: conversation.id,

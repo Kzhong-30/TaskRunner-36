@@ -8,6 +8,11 @@ export interface KnowledgeMatch {
   matchedBy: 'tfidf' | 'keyword' | 'hybrid';
 }
 
+interface ScoreEntry {
+  score: number;
+  method: 'tfidf' | 'keyword' | 'hybrid';
+}
+
 class KnowledgeService {
   private tfidfCache: {
     tfidf: TfIdf;
@@ -60,7 +65,7 @@ class KnowledgeService {
     const knowledgeMap = new Map(allKnowledge.map(k => [k.id, k]));
     const queryTokens = tokenize(query);
     const querySet = new Set(queryTokens);
-    const scores: Map<string, number> = new Map();
+    const scores: Map<string, ScoreEntry> = new Map();
 
     for (const k of allKnowledge) {
       let keywordHitScore = 0;
@@ -70,7 +75,7 @@ class KnowledgeService {
         }
       }
       if (keywordHitScore > 0) {
-        scores.set(k.id, keywordHitScore);
+        scores.set(k.id, { score: keywordHitScore, method: 'keyword' });
       }
     }
 
@@ -90,18 +95,27 @@ class KnowledgeService {
           const jaccard = jaccardSimilarity([...querySet], [...docTokens]);
           const normalizedTfIdf = docScores[i] / maxTfIdf;
           const hybrid = normalizedTfIdf * 0.65 + jaccard * 0.35;
-          scores.set(docIds[i], hybrid);
+          const existing = scores.get(docIds[i]);
+          if (existing) {
+            if (hybrid > existing.score) {
+              scores.set(docIds[i], { score: hybrid, method: 'hybrid' });
+            }
+          } else {
+            scores.set(docIds[i], { score: hybrid, method: 'tfidf' });
+          }
         } catch {
-          scores.set(docIds[i], 0);
+          if (!scores.has(docIds[i])) {
+            scores.set(docIds[i], { score: 0, method: 'tfidf' });
+          }
         }
       }
     }
 
     const results: KnowledgeMatch[] = [];
-    for (const [id, score] of scores) {
+    for (const [id, entry] of scores) {
       const k = knowledgeMap.get(id);
-      if (k && score > 0.03) {
-        results.push({ knowledge: k, score, matchedBy: 'tfidf' });
+      if (k && entry.score > 0.03) {
+        results.push({ knowledge: k, score: entry.score, matchedBy: entry.method });
       }
     }
     results.sort((a, b) => b.score - a.score);
