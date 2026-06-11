@@ -60,7 +60,19 @@ class KnowledgeService {
     const knowledgeMap = new Map(allKnowledge.map(k => [k.id, k]));
     const queryTokens = tokenize(query);
     const querySet = new Set(queryTokens);
-    const scores = new Map();
+    const scores: Map<string, number> = new Map();
+
+    for (const k of allKnowledge) {
+      let keywordHitScore = 0;
+      for (const qt of queryTokens) {
+        if (k.question.includes(qt) || k.answer.includes(qt)) {
+          keywordHitScore += 0.15;
+        }
+      }
+      if (keywordHitScore > 0) {
+        scores.set(k.id, keywordHitScore);
+      }
+    }
 
     if (queryTokens.length > 0) {
       const docScores = [];
@@ -88,7 +100,7 @@ class KnowledgeService {
     const results: KnowledgeMatch[] = [];
     for (const [id, score] of scores) {
       const k = knowledgeMap.get(id);
-      if (k && score > 0.02) {
+      if (k && score > 0.03) {
         results.push({ knowledge: k, score, matchedBy: 'tfidf' });
       }
     }

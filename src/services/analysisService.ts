@@ -82,12 +82,14 @@ class AnalysisService {
     const allTexts = messages.map(m => m.content);
 
     const sentiments = userTexts.map(t => this.analyzeSentiment(t));
-    const avgScore = sentiments.length > 0
-      ? sentiments.reduce((s, r) => s + r.score, 0) / sentiments.length
+    const rawAvgScore = sentiments.length > 0
+      ? Number(sentiments.reduce((s, r) => Number(s) + Number(r.score), 0)) / sentiments.length
       : 0;
-    const avgConf = sentiments.length > 0
-      ? sentiments.reduce((s, r) => s + r.confidence, 0) / sentiments.length
+    const avgScore = isNaN(rawAvgScore) ? 0 : rawAvgScore;
+    const rawAvgConf = sentiments.length > 0
+      ? Number(sentiments.reduce((s, r) => Number(s) + Number(r.confidence), 0)) / sentiments.length
       : 0.5;
+    const avgConf = isNaN(rawAvgConf) ? 0.5 : rawAvgConf;
 
     let sentimentLabel: 'positive' | 'neutral' | 'negative' = 'neutral';
     if (avgScore > 0.15) sentimentLabel = 'positive';

@@ -223,7 +223,6 @@ router.post('/:id/messages', async (req: Request, res: Response) => {
         );
 
         if (!isClientConnected) {
-          cleanup();
           return;
         }
 
@@ -243,10 +242,10 @@ router.post('/:id/messages', async (req: Request, res: Response) => {
         if (isClientConnected) {
           res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
         }
-
+      } finally {
+        if (isClientConnected) res.end();
+        cleanup();
       }
-      res.end();
-      cleanup();
       return;
     }
 
