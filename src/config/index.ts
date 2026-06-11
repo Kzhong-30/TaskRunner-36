@@ -16,6 +16,6 @@ export const config = {
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10)
   },
   sse: {
-    heartbeatInterval: parseInt(process.env.SSE_HEARTBEAT_INTERVAL || '15000', 10)
+    heartbeatInterval: parseInt(process.env.SSE_HEARTBEAT_INTERVAL || '10000', 10)
   }
 };

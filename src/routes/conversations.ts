@@ -223,6 +223,7 @@ router.post('/:id/messages', async (req: Request, res: Response) => {
         );
 
         if (!isClientConnected) {
+          cleanup();
           return;
         }
 

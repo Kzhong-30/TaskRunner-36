@@ -68,14 +68,15 @@ class KnowledgeService {
     const scores: Map<string, ScoreEntry> = new Map();
 
     for (const k of allKnowledge) {
-      let keywordHitScore = 0;
+      let keywordHitCount = 0;
       for (const qt of queryTokens) {
         if (k.question.includes(qt) || k.answer.includes(qt)) {
-          keywordHitScore += 0.15;
+          keywordHitCount += 1;
         }
       }
-      if (keywordHitScore > 0) {
-        scores.set(k.id, { score: keywordHitScore, method: 'keyword' });
+      if (keywordHitCount > 0) {
+        const normalizedKeywordScore = Math.min(1, keywordHitCount / Math.max(1, queryTokens.length));
+        scores.set(k.id, { score: normalizedKeywordScore, method: 'keyword' });
       }
     }
 

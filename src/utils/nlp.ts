@@ -20,10 +20,10 @@ const MEANINGLESS_BIGRAMS = new Set([
   '以及', '等等', '之类', '什么', '怎么', '为什么', '哪里', '哪个', '哪些', '怎样',
   '如何', '可以', '能够', '是否', '他们', '它们', '这个', '那个', '每个', '各个',
   '某个', '其他', '其它', '自己', '别人', '大家', '咱们', '你好', '您好', '谢谢',
-  '感谢', '抱歉', '对不起', '不好意思', '打扰了', '请问一下', '能不能', '可不可以',
+  '请问一下', '能不能', '可不可以',
   '行不行', '好不好', '对不对', '是不是', '有没有', '在不在', '了吗', '吗呢',
   '呢啊', '啊吧', '吧呀', '呀哦', '哦嗯', '的了', '了的', '是在', '在是', '我你',
-  '你我', '的是', '是的', '了投', '诉要', '要退', '差了', '了投', '了太', '差了', '了投', '投诉', '退换', '换货'
+  '你我', '的是', '是的', '了投', '诉要', '要退', '退了', '货退', '了太', '太差', '差了', '货联', '系人'
 ]);
 
 export function tokenize(text: string): string[] {
@@ -148,7 +148,7 @@ export function extractTopKeywords(texts: string[], topN = 10): Array<{ word: st
         const term = (t as any).term as string;
         const val = (t as any).tfidf as number;
         const prev = tfidfLookup.get(term) || 0;
-        tfidfLookup.set(term, prev + val);
+        tfidfLookup.set(term, Math.max(prev, val));
       }
     } catch {}
   }

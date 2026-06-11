@@ -216,11 +216,21 @@ class IntentService {
     const intents = await Intent.findAll({ where: { enabled: true } });
     this.classifier = new NaiveBayesIntentClassifier();
 
+    const KEYWORD_MAP: Record<string, string[]> = {
+      consultation: ['产品', '服务', '介绍', '价格', '功能', '使用', '规格', '特色', '材质', '优惠'],
+      complaint: ['投诉', '差', '垃圾', '失望', '骗', '烂', '不满', '态度', '举报', '虚假'],
+      after_sales: ['退货', '退款', '换货', '维修', '保修', '售后', '退换', '破损'],
+      order_query: ['订单', '快递', '发货', '物流', '收货', '查询', '单号', '到货'],
+      human_transfer: ['人工', '真人', '客服', '转人工', '活人', '管理员'],
+      unknown: []
+    };
+
     for (const intent of intents) {
       if (intent.name === 'unknown') continue;
       const examples = intent.examples || [];
+      const keywords = KEYWORD_MAP[intent.name] || [];
       for (const example of examples) {
-        this.classifier.addDocument(example, intent.name);
+        this.classifier.addDocument(example + ' ' + keywords.join(' '), intent.name);
       }
     }
 
@@ -254,11 +264,13 @@ class IntentService {
     ).slice(0, 10);
 
 
-    if (result.confidence < 0.12) {
+    const scaledConfidence = Math.pow(result.confidence, 0.6);
+
+    if (result.confidence < 0.05) {
       return {
         intent: 'unknown',
         displayName: this.getDisplayName('unknown'),
-        confidence: result.confidence,
+        confidence: scaledConfidence,
         matchedTokens: []
       };
     }
@@ -266,7 +278,7 @@ class IntentService {
     return {
       intent: intentName,
       displayName: this.getDisplayName(intentName),
-      confidence: result.confidence,
+      confidence: scaledConfidence,
       matchedTokens
     };
   }

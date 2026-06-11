@@ -105,23 +105,29 @@ class AnalysisService {
 
     const sentimentNorm = (avgScore + 1) / 2;
     const confWeight = overallSentiment.confidence;
-    let satisfactionScore = sentimentNorm * confWeight + 0.5 * (1 - confWeight);
+    const baseSat = sentimentNorm * confWeight + 0.5 * (1 - confWeight);
 
     const humanTransferRequested = userMessages.some(m =>
       /人工|真人|客服人员|不要机器人/.test(m.content)
     ) || conversation.status === 'waiting_for_human';
 
+    const humanPenaltyPct = 15;
+    const complaintPenaltyPct = 10;
+    const praiseBonusPct = 10;
+
+    const rawSat = baseSat * 100;
+    let satisfactionScore = rawSat;
     if (humanTransferRequested) {
-      satisfactionScore -= 0.15;
+      satisfactionScore -= humanPenaltyPct;
     }
     if (overallSentiment.label === 'negative') {
-      satisfactionScore -= 0.1;
+      satisfactionScore -= complaintPenaltyPct;
     }
     if (overallSentiment.label === 'positive' && confWeight > 0.6) {
-      satisfactionScore += 0.1;
+      satisfactionScore += praiseBonusPct;
     }
 
-    satisfactionScore = Math.round(Math.min(100, Math.max(0, satisfactionScore * 100)));
+    satisfactionScore = Math.max(0, Math.min(100, Math.round(satisfactionScore)));
 
     const keywords = extractTopKeywords(allTexts, 15);
 

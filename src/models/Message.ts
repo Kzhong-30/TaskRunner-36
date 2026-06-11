@@ -41,9 +41,11 @@ Message.init(
       type: DataTypes.UUID,
       allowNull: false,
       references: {
-        model: Conversation,
+        model: 'Conversations',
         key: 'id'
-      }
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'CASCADE'
     },
     role: {
       type: DataTypes.ENUM('user', 'assistant', 'system', 'human'),
